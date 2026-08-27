@@ -3,6 +3,13 @@
 `wnpm` is a small command-line tool that sits in front of **`npm install`**.
 Use it when you want installs to go through a **consistent policy layer** instead of calling `npm` directly.
 
+> **Use `2.0.0` or later.** Versions before `2.0.0` call a server endpoint
+> that's since been removed and will fail on every install. If you have an
+> older version installed globally, update it:
+> ```bash
+> npm install -g @_wnpm/wnpm-cli@latest
+> ```
+
 ## Requirements
 
 - **Node.js 18+** (uses the built-in `fetch` client)
@@ -52,6 +59,19 @@ For each package being considered, the CLI resolves a concrete version (via `npm
 
 - This tool is focused on the **install** path (`install` / `i`). Other `npm` subcommands are not the primary use case.
 - You need a **reachable wnpm API**; without it, installs that require checks will fail at the network step.
+
+## Pointing at a different server
+
+By default `wnpm` talks to the hosted production API. To point it at a
+different one — a local `wnpm-server` you're running yourself, a staging
+deploy — set `WNPM_API_URL`:
+
+```bash
+WNPM_API_URL=http://localhost:3847 wnpm install lodash
+```
+
+No env var needed for normal use; this is only for testing against a
+non-production server.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 const { spawnSync } = require("child_process");
 const readline = require("readline");
-const { checkPackages } = require("./api");
+const { auditPackages } = require("./api");
 const {
   getPackages,
   getDepsFromPackageJson,
@@ -55,8 +55,7 @@ function askUser(question) {
   let apiResults = [];
   if (payload.length > 0) {
     try {
-      const data = await checkPackages(payload);
-      apiResults = data.results || [];
+      apiResults = (await auditPackages(payload)) || [];
     } catch (e) {
       console.error("❌ API error:", e.message);
       process.exit(1);
@@ -83,41 +82,47 @@ function askUser(question) {
     console.log(`\n🔍 Checking ${item.name}@${row.version}...`);
 
     let finalVersion = row.version;
+    let installBlocked = row.blocked;
 
-    if (row.isNew && row.recommendedVersion) {
+    if (row.isNew) {
       console.log(
-        `⚠️ wnpm has extra guidance for ${item.name}@${row.version}.`
-      );
-      console.log(
-        `   Suggested version: ${item.name}@${row.recommendedVersion} (preferred for this install).`
-      );
-      const answer = await askUser(
-        `   Use ${row.recommendedVersion}? (y/n): `
-      );
-      if (answer === "y") {
-        console.log(`✔️ Using ${row.recommendedVersion}`);
-        finalVersion = row.recommendedVersion;
-      } else {
-        console.log("⚠️ Keeping your requested version...");
-      }
-    } else if (row.isNew) {
-      console.log(
-        `⚠️ wnpm has extra guidance for ${item.name}@${row.version}; no alternate version is suggested right now.`
+        `⚠️ ${item.name}@${row.version} was published very recently (< 24h ago).`
       );
     }
 
     if (row.vulnIds && row.vulnIds.length > 0) {
-      console.log("❌ Findings:");
+      const severityLabel = row.severity
+        ? ` (${row.severity}${row.cvssScore != null ? `, CVSS ${row.cvssScore}` : ""})`
+        : "";
+      console.log(`❌ Findings${severityLabel}:`);
       row.vulnIds.forEach((id) => console.log(`   - ${id}`));
     }
 
-    if (row.blocked) {
+    if (row.blocked && row.recommendedVersion) {
+      console.log(`❌ ${item.name}@${row.version} is blocked due to known vulnerabilities.`);
+      console.log(
+        `   A non-vulnerable version is available: ${item.name}@${row.recommendedVersion}.`
+      );
+      const answer = await askUser(
+        `   Install ${row.recommendedVersion} instead? (y/n): `
+      );
+      if (answer === "y") {
+        console.log(`✔️ Using ${row.recommendedVersion} instead.`);
+        finalVersion = row.recommendedVersion;
+        installBlocked = false;
+      } else {
+        console.log("❌ Keeping requested version — install not allowed for this package.");
+      }
+    } else if (row.blocked) {
       console.log("❌ Install not allowed for this package.");
-      hasHighRisk = true;
     } else if (row.level === "medium") {
       console.log("⚠️ Proceed with caution for this package.");
     } else {
       console.log("✅ Cleared to proceed.");
+    }
+
+    if (installBlocked) {
+      hasHighRisk = true;
     }
 
     const specChanged = finalVersion !== row.version;

@@ -1,0 +1,4 @@
+node_modules
+
+# local-only feature docs, never committed
+docs/features/

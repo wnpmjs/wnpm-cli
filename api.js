@@ -1,11 +1,9 @@
 function getApiBaseUrl() {
-  return (
-    "https://wnpm-server-production.up.railway.app"
-  );
+  return process.env.WNPM_API_URL || "https://wnpm-server-production.up.railway.app";
 }
 
-async function checkPackages(packages) {
-  const url = `${getApiBaseUrl()}/api/check/packages`;
+async function auditPackages(packages) {
+  const url = `${getApiBaseUrl()}/api/audit/packages`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -19,9 +17,9 @@ async function checkPackages(packages) {
     throw new Error(`API ${res.status}: ${text}`);
   }
   if (!res.ok) {
-    throw new Error(json.error || `API ${res.status}: ${text}`);
+    throw new Error(json.message || `API ${res.status}: ${text}`);
   }
-  return json;
+  return json.data;
 }
 
-module.exports = { checkPackages, getApiBaseUrl };
+module.exports = { auditPackages, getApiBaseUrl };
