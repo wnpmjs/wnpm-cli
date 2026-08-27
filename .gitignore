@@ -1,7 +1,7 @@
 node_modules
 
-# local-only feature docs, never committed
-docs/features/
+# local-only docs, never committed - this repo is public
+docs/
 
 # local agent config, never committed
 .claude/
