@@ -60,19 +60,6 @@ For each package being considered, the CLI resolves a concrete version (via `npm
 - This tool is focused on the **install** path (`install` / `i`). Other `npm` subcommands are not the primary use case.
 - You need a **reachable wnpm API**; without it, installs that require checks will fail at the network step.
 
-## Pointing at a different server
-
-By default `wnpm` talks to the hosted production API. To point it at a
-different one — a local `wnpm-server` you're running yourself, a staging
-deploy — set `WNPM_API_URL`:
-
-```bash
-WNPM_API_URL=http://localhost:3847 wnpm install lodash
-```
-
-No env var needed for normal use; this is only for testing against a
-non-production server.
-
 ## License
 
 ISC

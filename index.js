@@ -1,153 +1,32 @@
 #!/usr/bin/env node
 
-const { spawnSync } = require("child_process");
-const readline = require("readline");
-const { auditPackages } = require("./api");
-const {
-  getPackages,
-  getDepsFromPackageJson,
-  getResolvedVersion,
-  packageBaseName,
-} = require("./utils");
+const { runLogin } = require("./commands/login");
+const { runUsage } = require("./commands/usage");
+const { runInteractiveSession } = require("./commands/session");
+const { runInstall } = require("./commands/install");
+const { LOGIN, USAGE } = require("./constants/commandNames");
 
 const args = process.argv.slice(2);
 
-function askUser(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase());
-    });
-  });
-}
+// Central registry: a new named command is added here, not as another
+// if/else branch. Anything not matched here (including `install`/`i`,
+// which needs its own arg parsing) falls through to runInstall.
+const commands = {
+  [LOGIN]: runLogin,
+  [USAGE]: runUsage,
+};
 
 (async () => {
-  let pkgs = getPackages(args);
-  if (!pkgs.length) {
-    pkgs = getDepsFromPackageJson();
+  if (args.length === 0) {
+    await runInteractiveSession();
+    return;
   }
 
-  console.log("🔍 Running wnpm checks...\n");
-
-  const installOrder = [];
-  const payload = [];
-
-  for (const pkg of pkgs) {
-    const name = packageBaseName(pkg);
-    const version = getResolvedVersion(pkg);
-
-    if (!version) {
-      console.log(
-        `⚠️ Could not resolve version for ${pkg}, installing as-is`
-      );
-      installOrder.push({ pkg, name, version: null, skipApi: true });
-      continue;
-    }
-
-    installOrder.push({ pkg, name, version, skipApi: false });
-    payload.push({ name, version });
+  const handler = commands[args[0]];
+  if (handler) {
+    await handler(args.slice(1));
+    return;
   }
 
-  let apiResults = [];
-  if (payload.length > 0) {
-    try {
-      apiResults = (await auditPackages(payload)) || [];
-    } catch (e) {
-      console.error("❌ API error:", e.message);
-      process.exit(1);
-    }
-  }
-
-  let hasHighRisk = false;
-  const finalInstallList = [];
-  let resultIdx = 0;
-
-  for (const item of installOrder) {
-    if (item.skipApi) {
-      finalInstallList.push(item.pkg);
-      continue;
-    }
-
-    const row = apiResults[resultIdx++];
-    if (!row || !row.ok) {
-      console.log(`\n⚠️ No API result for ${item.name}, installing as-is`);
-      finalInstallList.push(item.pkg);
-      continue;
-    }
-
-    console.log(`\n🔍 Checking ${item.name}@${row.version}...`);
-
-    let finalVersion = row.version;
-    let installBlocked = row.blocked;
-
-    if (row.isNew) {
-      console.log(
-        `⚠️ ${item.name}@${row.version} was published very recently (< 24h ago).`
-      );
-    }
-
-    if (row.vulnIds && row.vulnIds.length > 0) {
-      const severityLabel = row.severity
-        ? ` (${row.severity}${row.cvssScore != null ? `, CVSS ${row.cvssScore}` : ""})`
-        : "";
-      console.log(`❌ Findings${severityLabel}:`);
-      row.vulnIds.forEach((id) => console.log(`   - ${id}`));
-    }
-
-    if (row.blocked && row.recommendedVersion) {
-      console.log(`❌ ${item.name}@${row.version} is blocked due to known vulnerabilities.`);
-      console.log(
-        `   A non-vulnerable version is available: ${item.name}@${row.recommendedVersion}.`
-      );
-      const answer = await askUser(
-        `   Install ${row.recommendedVersion} instead? (y/n): `
-      );
-      if (answer === "y") {
-        console.log(`✔️ Using ${row.recommendedVersion} instead.`);
-        finalVersion = row.recommendedVersion;
-        installBlocked = false;
-      } else {
-        console.log("❌ Keeping requested version — install not allowed for this package.");
-      }
-    } else if (row.blocked) {
-      console.log("❌ Install not allowed for this package.");
-    } else if (row.level === "medium") {
-      console.log("⚠️ Proceed with caution for this package.");
-    } else {
-      console.log("✅ Cleared to proceed.");
-    }
-
-    if (installBlocked) {
-      hasHighRisk = true;
-    }
-
-    const specChanged = finalVersion !== row.version;
-    finalInstallList.push(
-      specChanged ? `${item.name}@${finalVersion}` : item.pkg
-    );
-  }
-
-  if (hasHighRisk) {
-    console.log("\n🚫 Installation stopped by wnpm.");
-    process.exit(1);
-  }
-
-  console.log("\n📦 Final install list:", finalInstallList);
-  console.log("\n🚀 Installing...\n");
-
-  if (!getPackages(args).length) {
-    spawnSync("npm", args, { stdio: "inherit" });
-  } else {
-    const result = spawnSync("npm", ["install", ...finalInstallList], {
-      stdio: "inherit",
-    });
-    if (result.status !== 0) {
-      console.log("❌ npm install failed");
-      process.exit(1);
-    }
-  }
+  await runInstall(args);
 })();

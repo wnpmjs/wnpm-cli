@@ -1,14 +1,29 @@
 {
   "name": "@_wnpm/wnpm-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Secure npm wrapper",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wnpmjs/wnpm-cli.git"
+  },
+  "homepage": "https://github.com/wnpmjs/wnpm-cli#readme",
+  "bugs": {
+    "url": "https://github.com/wnpmjs/wnpm-cli/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
   "bin": {
     "wnpm": "index.js"
   },
-  "files": ["index.js", "api.js", "utils.js"],
+  "files": [
+    "index.js",
+    "api.js",
+    "auth.js",
+    "utils.js",
+    "commands",
+    "constants"
+  ],
   "engines": {
     "node": ">=18"
   },
